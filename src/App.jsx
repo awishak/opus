@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 const STORAGE_KEY = "songbattle_db_v3";
 const FONT = "'DM Sans', 'Helvetica Neue', system-ui, sans-serif";
@@ -32,8 +32,31 @@ function calcElo(songs, matchups) {
   return elo;
 }
 
-async function loadDB() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : emptyDB(); } catch { return emptyDB(); } }
-async function saveDB(db) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { console.error(e); } }
+const SUPABASE_URL = "https://ybuchgebudixbyrcxpik.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlidWNoZ2VidWRpeGJ5cmN4cGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzg3OTIsImV4cCI6MjA4ODA1NDc5Mn0.aF2M_fj6bVYKw-Tz1XxI9SiQB7lAtWzuhBRZbsai8QY";
+
+async function supaFetch(method, body) {
+  const url = `${SUPABASE_URL}/rest/v1/opus_data?id=eq.main`;
+  const headers = { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": method === "POST" ? "resolution=merge-duplicates" : undefined };
+  Object.keys(headers).forEach(k => headers[k] === undefined && delete headers[k]);
+  const res = await fetch(method === "GET" ? url + "&select=data" : url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  return res;
+}
+
+async function loadDB() {
+  try {
+    const res = await supaFetch("GET");
+    const rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].data) return rows[0].data;
+    return emptyDB();
+  } catch { return emptyDB(); }
+}
+
+async function saveDB(db) {
+  try {
+    await supaFetch("POST", { id: "main", data: db, updated_at: new Date().toISOString() });
+  } catch (e) { console.error(e); }
+}
 
 const SEED = [
 ["Shot in the Dark","John Mayer","2021",48,1],["If I Ever Get Around To Living","John Mayer","2012",46,0],["In My Place","Coldplay","2002",46,4],["Queen of California","John Mayer","2012",45,4],["#41","Dave Matthews Band","1996",44,3],["Wanna Be Startin' Somethin'","Michael Jackson","1982",43,6],["So Much to Say","Dave Matthews Band","1996",41,5],["Linger","The Cranberries","1994",41,7],["Come Around","Bernhoft","2014",41,13],["Wild Blue","John Mayer","2021",40,3],["Gravity (Live at the Nokia Theatre)","John Mayer","2007",38,8],["Deep In Love","Bonny Light Horseman","2020",38,14],["Clarity","John Mayer","2003",35,11],["Only Wanna Be With You","Hootie & The Blowfish","1995",35,11],["In Repair","John Mayer","2006",35,19],["My Favorite Mistake","Sheryl Crow","1999",34,1],["Louie Bag (Live at Electric Lady)","Yebba","2022",34,12],["Hey Ya!","Outkast","2002",34,17],["Jaded","Aerosmith","2001",33,12],["Love Is An Ocean","KT Tunstall","2017",32,12],["Lancaster Nights","Charlie Burg","2021",30,15],["Wild","Spoon","2022",30,17],["Overnight","Maggie Rogers","2018",29,14],["Belief","John Mayer","2006",29,17],["So Fresh, So Clean","Outkast","2001",28,13],["Infinitely Tall","Charlie Burg","2022",26,12],["Yellow","Coldplay","1999",26,12],["Chloroform","Phoenix","2013",25,13],["Retrograde","Maggie Rogers","2018",23,10],["Fallingwater","Maggie Rogers","2018",23,12],["Good Energy","Mike Sabath","2020",22,10],["Fulton County Jane Doe","Brandi Carlile","2018",22,11],["God - Senna Theme Reprise Redux","Antonio Pinto","2011",22,14],["Slow Dancing in a Burning Room","John Mayer","2006",22,14],["Moving On And Getting Over","John Mayer","2017",21,13],["We Walk the Same Line","Everything But The Girl","1994",21,13],["Vultures","John Mayer","2006",20,11],["They Want My Soul","Spoon","2014",20,12],["Orphans","Coldplay","2020",19,14],["Rent I Pay","Spoon","2014",19,15],["Southern Sun","Boy & Bear","2013",19,15],["Learning to Fly","Tom Petty and the Heartbreakers","1991",18,8],["Neon","John Mayer","2002",18,12],["The Middle","Jimmy Eat World","2002",18,12],["Everybody Wants To Rule The World","Tears For Fears","1985",18,13],["Feels Alright","Spoon","2022",18,13],["Sunday Morning","Maroon 5","2002",18,14],["Blue Sky","Allman Brothers","1972",17,14],["TV","Sebastian Yatra","2022",17,14],["Dreams","Fleetwood Mac","1977",17,15],["One Time Too Many","Phoenix","2006",17,15],["Trying To Be Cool","Phoenix","2013",17,16],["Almost (Sweet Music)","Hozier","2019",16,8],["Gypsy","Fleetwood Mac","1982",16,9],["Heavy, California","Jungle","2018",15,11],["After Midnight","Phoenix","2022",15,13],["Don't Look Back in Anger","Oasis","1995",15,18],["The Game of Love","Santana ft. Michelle Branch","2002",15,18],["Yanada","The Preatures","2014",15,18],["Fantasy","Mariah Carey","1995",15,19],["I Wanna Dance With Somebody","Whitney Houston","1987",14,10],["September","Earth, Wind and Fire","1978",14,16],["Texas Flood","Stevie Ray Vaughan","1983",14,17],["Almighty Gosh","Lucius","2022",14,18],["Lo/Hi","The Black Keys","2019",14,19],["The Way It Is","Bruce Hornsby & The Range","1986",14,19],["Astral Weeks","Van Morrison","1968",13,7],["The Remedy (I Won't Worry)","Jason Mraz","2002",13,16],["Hoops","Julia Wolf","2021",13,18],["Fever","Roosevelt","2016",13,20],["Life in Technicolor","Coldplay","2008",13,22],["Time","Hootie & The Blowfish","1995",13,22],["Slow Burn","Kacey Musgraves","2018",12,8],["Summertime","The Sundays","1997",12,16],["Gemini and Leo","Helado Negro","2019",12,17],["Sit Next to Me","Foster The People","2017",12,17],["Spiderwebs","No Doubt","1995",12,17],["Nick of Time","Bonnie Raitt","1989",12,18],["Evergreen","Yebba","2021",12,20],["Ironic","Alanis Morissette","1995",12,20],["Falling In Place","Dog's Eye View","1996",11,18],["Formation","Beyonce","2016",10,13],["Love Song","Sara Bareilles","2007",10,23],["Orange Blood","Mt. Joy","2022",10,24],["Uncharted","Sara Bareilles","2011",10,24],["A Promise To Keep","Brandi Carlile","2012",10,26],["You Get What You Give","The New Radicals","1998",9,8],["Free Fallin'","Tom Petty","1989",9,15],["Friday I'm In Love","The Cure","1992",9,19],["Bend & Break","Keane","2004",9,20],["Some Say","Rascal Flatts","2006",9,22],["Simple Song","The Shins","2012",9,24],["Dog Years","Maggie Rogers","2019",8,4],["You Oughta Know","Alanis Morissette","1995",8,8],["Drive","The Cars","1984",8,15],["Don't Dream It's Over","Crowded House","1986",8,20],["Don't You Evah","Spoon","2007",8,22],["You Can Call Me Al","Paul Simon","1986",8,22],["Hard Way Home","Brandi Carlile","2012",8,23],["Apartment","Young the Giant","2010",8,24],["Another Life","Third Eye Blind","2003",8,25],["Midnight City","M83","2011",8,27],["Keep Your Heart Young","Brandi Carlile","2012",7,19],["Harder To Breathe","Maroon 5","2002",7,22],["Goodbye Soleil","Phoenix","2017",7,23],["Beautiful Day","U2","2000",6,22],["Take A Picture","Filter","1999",6,24],["Cool","Dua Lipa","2019",6,25],["Just Like Heaven","The Cure","1987",5,18],["Fine Line","Little Big Town","2017",5,22],["I Don't Want to Miss a Thing","Aerosmith","1998",5,23],["Oh, What A World","Kacey Musgraves","2018",5,23],["This Is America","Childish Gambino","2018",5,25],["You Make My Dreams (Come True)","Hall & Oates","1981",4,10],["Interstate Love Song","Stone Temple Pilots","1994",4,13],["Nao Me Toca","Anselmo Ralph","2012",4,13],["Respect","Aretha Franklin","1967",4,17],["Blame It on Me","George Ezra","2014",4,24],["Times Like These","Foo Fighters","2002",4,24],["Flynn Lives","Daft Punk","2010",4,25],["Many the Miles","Sara Bareilles","2007",3,27],["U.F.O.","Coldplay","2008",3,27],["Drakkar Noir","Phoenix","2013",3,29],["Dare You To Move","Switchfoot","2003",2,6],["Everywhere","Fleetwood Mac","1987",2,12],["Single, No Return","Ten Fe","2017",1,3],["The Power of Love","Huey Lewis & The News","1985",1,9],["Earth Song","Michael Jackson","1995",0,0],["Suck on Light","Boy & Bear","2019",0,0],["Baby I Love Your Way","Big Mountain","1994",0,0],["Booster Seat","Spacey Jane","2020",0,0],["Brooklyn Baby","Flipturn","2021",0,0],["Glistening","Flipturn","2021",0,0],["Juno","Flipturn","2021",0,0],["Rodeo Clown","Flipturn","2021",0,0],["Whales","Flipturn","2019",0,0],["Brazil","Declan McKenna","2017",0,0],["Mariella","Khruangbin","2019",0,0],["First Blush","Ocean Alley","2018",0,0],["Simple Man","Brandon Heath","2008",0,0],["Like A Child","Jars Of Clay","1995",0,0],["Best of My Love","The Emotions","1977",0,0],["Pinch Me","Barenaked Ladies","2000",0,0],["Who Needs Shelter","Jason Mraz","2002",0,0],["Saltwater","Geowulf","2017",0,0],["Scream","Michael Jackson & Janet Jackson","1995",0,0],["Pig","Dave Matthews Band","1998",0,0],["Someday","Sugar Ray","1999",0,0],["Bluebird","Sara Bareilles","2007",0,0],["Plush","Stone Temple Pilots","1992",0,0],["Live in the Moment","Portugal. The Man","2017",0,0],["Stand by Me","Ben E. King","1961",0,0]
@@ -204,26 +227,50 @@ export default function App() {
 
   // Album art cache
   const [artCache, setArtCache] = useState({});
+  const fetchQueue = React.useRef(Promise.resolve());
   const fetchArt = useCallback(async (title, artist, id) => {
-    if (artCache[id]) return;
-    try {
-      const q = encodeURIComponent(`${title} ${artist}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
-      const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        const url = data.results[0].artworkUrl100.replace("100x100", "60x60");
-        setArtCache(prev => ({ ...prev, [id]: url }));
-      } else {
-        setArtCache(prev => ({ ...prev, [id]: null }));
-      }
-    } catch { setArtCache(prev => ({ ...prev, [id]: null })); }
+    if (artCache[id] !== undefined) return;
+    // Mark as loading immediately to prevent duplicate fetches
+    setArtCache(prev => prev[id] !== undefined ? prev : { ...prev, [id]: "loading" });
+    // Queue fetches with a small delay to avoid rate limiting
+    fetchQueue.current = fetchQueue.current.then(() => new Promise(resolve => {
+      setTimeout(async () => {
+        try {
+          const q = encodeURIComponent(`${title} ${artist}`);
+          const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=3`);
+          if (!res.ok) { setArtCache(prev => ({ ...prev, [id]: "retry" })); resolve(); return; }
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            const url = data.results[0].artworkUrl100.replace("100x100", "60x60");
+            setArtCache(prev => ({ ...prev, [id]: url }));
+          } else {
+            setArtCache(prev => ({ ...prev, [id]: null }));
+          }
+        } catch {
+          setArtCache(prev => ({ ...prev, [id]: "retry" }));
+        }
+        resolve();
+      }, 120);
+    }));
+  }, [artCache]);
+
+  // Retry failed fetches periodically
+  useEffect(() => {
+    const retryIds = Object.entries(artCache).filter(([_, v]) => v === "retry");
+    if (retryIds.length === 0) return;
+    const timer = setTimeout(() => {
+      const reset = { ...artCache };
+      retryIds.forEach(([id]) => { delete reset[id]; });
+      setArtCache(reset);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [artCache]);
 
   const ArtImg = ({ song }) => {
     useEffect(() => { if (artCache[song.id] === undefined) fetchArt(song.title, song.artist, song.id); }, [song.id, song.title, song.artist]);
     const url = artCache[song.id];
-    if (url === undefined) return <div style={{ width: 40, height: 40, borderRadius: 6, background: "#f0f0f0", flexShrink: 0 }} />;
-    if (url === null) return <div style={{ width: 40, height: 40, borderRadius: 6, background: "#f5f5f5", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 16, color: "#ddd" }}>♪</span></div>;
+    if (url === undefined || url === "loading") return <div style={{ width: 40, height: 40, borderRadius: 6, background: "#f0f0f0", flexShrink: 0 }} />;
+    if (url === null || url === "retry") return <div style={{ width: 40, height: 40, borderRadius: 6, background: "#f5f5f5", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 16, color: "#ddd" }}>♪</span></div>;
     return <img src={url} alt="" style={{ width: 40, height: 40, borderRadius: 6, flexShrink: 0, objectFit: "cover" }} />;
   };
 
@@ -313,30 +360,35 @@ export default function App() {
 
     // Artist image component
     const ArtistImg = ({ name, size = 48 }) => {
-      const [url, setUrl] = useState(artCache["artist_" + name]);
+      const key = "artist_" + name;
+      const [url, setUrl] = useState(artCache[key]);
       useEffect(() => {
         if (url !== undefined) return;
-        const key = "artist_" + name;
         if (artCache[key] !== undefined) { setUrl(artCache[key]); return; }
-        const q = encodeURIComponent(name);
-        fetch(`https://itunes.apple.com/search?term=${q}&entity=musicArtist&limit=1`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.results?.[0]?.artistLinkUrl) {
-              fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`)
-                .then(r2 => r2.json())
-                .then(d2 => {
-                  const art = d2.results?.[0]?.artworkUrl100?.replace("100x100", "120x120") || null;
-                  setArtCache(prev => ({ ...prev, [key]: art }));
-                  setUrl(art);
-                }).catch(() => { setArtCache(prev => ({ ...prev, [key]: null })); setUrl(null); });
-            } else {
-              setArtCache(prev => ({ ...prev, [key]: null })); setUrl(null);
+        setArtCache(prev => prev[key] !== undefined ? prev : { ...prev, [key]: "loading" });
+        fetchQueue.current = fetchQueue.current.then(() => new Promise(resolve => {
+          setTimeout(async () => {
+            try {
+              const q = encodeURIComponent(name);
+              const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&limit=1`);
+              if (!res.ok) { setArtCache(prev => ({ ...prev, [key]: "retry" })); setUrl("retry"); resolve(); return; }
+              const data = await res.json();
+              const art = data.results?.[0]?.artworkUrl100?.replace("100x100", "120x120") || null;
+              setArtCache(prev => ({ ...prev, [key]: art }));
+              setUrl(art);
+            } catch {
+              setArtCache(prev => ({ ...prev, [key]: "retry" }));
+              setUrl("retry");
             }
-          }).catch(() => { setArtCache(prev => ({ ...prev, [key]: null })); setUrl(null); });
-      }, [name, url]);
+            resolve();
+          }, 120);
+        }));
+      }, [name, url, key]);
 
-      if (url === undefined || url === null) return (
+      // Pick up retries
+      useEffect(() => { if (artCache[key] && artCache[key] !== url) setUrl(artCache[key]); }, [artCache[key]]);
+
+      if (url === undefined || url === "loading" || url === "retry" || url === null) return (
         <div style={{ width: size, height: size, borderRadius: size / 2, background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <span style={{ fontSize: size * 0.38, color: "#ccc" }}>♪</span>
         </div>
