@@ -235,6 +235,7 @@ function App({ userId, userName, useSeed }) {
   const [anim, setAnim] = useState(null);
   const [search, setSearch] = useState("");
   const [minGP, setMinGP] = useState(10);
+  const [sortBy, setSortBy] = useState("pct");
   const [editSong, setEditSong] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", artist: "", year: "" });
   const [delConfirm, setDelConfirm] = useState(null);
@@ -268,7 +269,30 @@ function App({ userId, userName, useSeed }) {
     return { ...s, w: st.w, l: st.l, m: st.m, pct: wpn(st.w, st.l), elo: Math.round(elo[s.id] || 1500) };
   }), [db.songs, stats, elo]);
 
-  const ranked = useMemo(() => enriched.filter((s) => s.m >= minGP && !s.archived).sort((a, b) => b.pct !== a.pct ? b.pct - a.pct : b.m - a.m), [enriched, minGP]);
+  // Compute Q1 wins: wins against songs in top 25% by win pct (with minGP+ matchups)
+  const q1Data = useMemo(() => {
+    const qualifiedByPct = enriched.filter(s => s.m >= minGP && !s.archived).sort((a, b) => b.pct - a.pct);
+    const q1Cutoff = Math.max(1, Math.ceil(qualifiedByPct.length * 0.25));
+    const q1Ids = new Set(qualifiedByPct.slice(0, q1Cutoff).map(s => s.id));
+    const q1w = {};
+    db.songs.forEach(s => { q1w[s.id] = 0; });
+    // Count imported wins roughly — we can't know opponents, so only count live matchups
+    db.matchups.forEach(m => {
+      if (q1Ids.has(m.li)) { q1w[m.wi] = (q1w[m.wi] || 0) + 1; }
+    });
+    return { q1Ids, q1w };
+  }, [enriched, db.matchups, db.songs, minGP]);
+
+  const enrichedWithQ1 = useMemo(() => enriched.map(s => ({ ...s, q1w: q1Data.q1w[s.id] || 0 })), [enriched, q1Data]);
+
+  const sortFn = useCallback((a, b) => {
+    if (sortBy === "wins") return b.w !== a.w ? b.w - a.w : b.pct - a.pct;
+    if (sortBy === "elo") return b.elo !== a.elo ? b.elo - a.elo : b.pct - a.pct;
+    if (sortBy === "q1") return b.q1w !== a.q1w ? b.q1w - a.q1w : b.pct - a.pct;
+    return b.pct !== a.pct ? b.pct - a.pct : b.m - a.m;
+  }, [sortBy]);
+
+  const ranked = useMemo(() => enrichedWithQ1.filter((s) => s.m >= minGP && !s.archived).sort(sortFn), [enrichedWithQ1, minGP, sortFn]);
 
   const pick = useCallback(() => {
     const active = db.songs.filter(s => !s.archived);
@@ -444,9 +468,9 @@ function App({ userId, userName, useSeed }) {
   };
 
   const Standings = () => {
-    const activeEnriched = enriched.filter(s => !s.archived);
+    const activeEnriched = enrichedWithQ1.filter(s => !s.archived);
     const unranked = activeEnriched.filter((s) => s.m < minGP).sort((a, b) => a.m - b.m);
-    const list = stFilt === "all" ? ranked : stFilt === "unranked" ? unranked : [...activeEnriched].sort((a, b) => b.pct !== a.pct ? b.pct - a.pct : b.m - a.m);
+    const list = stFilt === "all" ? ranked : stFilt === "unranked" ? unranked : [...activeEnriched].sort(sortFn);
     const filtered = search ? list.filter((s) => (s.title + " " + s.artist).toLowerCase().includes(search.toLowerCase())) : list;
     return (
       <div>
@@ -454,6 +478,13 @@ function App({ userId, userName, useSeed }) {
           <button style={tog(stFilt === "all")} onClick={() => setStFilt("all")}>Ranked ({ranked.length})</button>
           <button style={tog(stFilt === "unranked")} onClick={() => setStFilt("unranked")}>Needs More ({unranked.length})</button>
           <button style={tog(stFilt === "everyone")} onClick={() => setStFilt("everyone")}>All ({activeEnriched.length})</button>
+        </div>
+        <div style={{ display: "flex", gap: 5, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "#aaa", marginRight: 4 }}>Sort:</span>
+          <button style={tog(sortBy === "pct")} onClick={() => setSortBy("pct")}>Win %</button>
+          <button style={tog(sortBy === "wins")} onClick={() => setSortBy("wins")}>Wins</button>
+          <button style={tog(sortBy === "elo")} onClick={() => setSortBy("elo")}>Elo</button>
+          <button style={tog(sortBy === "q1")} onClick={() => setSortBy("q1")}>Q1 Wins</button>
         </div>
         <div style={{ display: "flex", gap: 5, marginBottom: 14, alignItems: "center" }}>
           <span style={{ fontSize: 11, color: "#aaa", marginRight: 4 }}>Min GP:</span>
@@ -464,7 +495,7 @@ function App({ userId, userName, useSeed }) {
         {filtered.length === 0 ? (<div style={{ textAlign: "center", padding: "40px 24px", color: "#bbb" }}><p style={{ fontSize: 14, fontWeight: 500 }}>{search ? "No matches" : `Songs need ${minGP}+ matchups`}</p></div>) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={{ ...TH, width: 34 }}>#</th><th style={TH}></th><th style={TH}>Song</th><th style={{ ...TH, textAlign: "right" }}>W</th><th style={{ ...TH, textAlign: "right" }}>L</th><th style={{ ...TH, textAlign: "right" }}>Pct</th><th style={{ ...TH, textAlign: "right" }}>Elo</th><th style={{ ...TH, textAlign: "right" }}>GP</th></tr></thead>
+              <thead><tr><th style={{ ...TH, width: 34 }}>#</th><th style={TH}></th><th style={TH}>Song</th><th style={{ ...TH, textAlign: "right" }}>W</th><th style={{ ...TH, textAlign: "right" }}>L</th><th style={{ ...TH, textAlign: "right" }}>Pct</th><th style={{ ...TH, textAlign: "right" }}>Elo</th><th style={{ ...TH, textAlign: "right" }}>Q1</th><th style={{ ...TH, textAlign: "right" }}>GP</th></tr></thead>
               <tbody>{filtered.map((s, i) => {
                 const r = stFilt === "all" ? ranked.indexOf(s) + 1 : i + 1;
                 const top = r <= 3 && stFilt === "all";
@@ -476,6 +507,7 @@ function App({ userId, userName, useSeed }) {
                   <td style={{ ...TD, textAlign: "right", color: "#cb2431" }}>{s.l}</td>
                   <td style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{s.m >= minGP ? wp(s.w, s.l) + "%" : <span style={{ color: "#ccc" }}>{wp(s.w, s.l)}%</span>}</td>
                   <td style={{ ...TD, textAlign: "right", color: "#7c6bbf", fontWeight: 600, fontSize: 12 }}>{s.elo}</td>
+                  <td style={{ ...TD, textAlign: "right", color: s.q1w > 0 ? "#e67e22" : "#ddd", fontWeight: 600, fontSize: 12 }}>{s.q1w}</td>
                   <td style={{ ...TD, textAlign: "right", color: "#aaa" }}>{s.m}</td>
                 </tr>);
               })}</tbody>
