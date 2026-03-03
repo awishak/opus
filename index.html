@@ -25,10 +25,10 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 // seed: true = load your SEED data, false = start with empty database
 const USERS = {
   "main": { name: "Drew", code: "previa", seed: true },
-   "zack": { name: "Zack", code: "greenday", seed: false },
-   "jianna": { name: "Jianna", code: "41", seed: false },
-    "stacy": { name: "Stacy", code: "jazzdawg", seed: false },
-   "evie": { name: "Evie", code: "trumpet", seed: false },
+  "zack": { name: "Zack", code: "greenday", seed: false },
+  "jianna": { name: "Jianna", code: "41", seed: false },
+  "stacy": { name: "Stacy", code: "jazzdawg", seed: false },
+  "evie": { name: "Evie", code: "trumpet", seed: false },
 };
 
 function getUserFromURL() {
@@ -108,10 +108,21 @@ function buildSeed() {
 
 function Gate() {
   const [userId, setUserId] = useState(getUserFromURL());
+  const [nameInput, setNameInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [authed, setAuthed] = useState(false);
   const [error, setError] = useState("");
-  const [userList, setUserList] = useState(null);
+
+  // Look up user by slug (from URL) or by matching display name
+  const findUser = (input) => {
+    const lower = input.toLowerCase().trim();
+    // Check slug match first
+    if (USERS[lower]) return { slug: lower, ...USERS[lower] };
+    // Then check display name match
+    const entry = Object.entries(USERS).find(([_, u]) => u.name.toLowerCase() === lower);
+    if (entry) return { slug: entry[0], ...entry[1] };
+    return null;
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -120,6 +131,19 @@ function Gate() {
     const stored = localStorage.getItem(`opus_auth_${userId}`);
     if (stored === user.code) setAuthed(true);
   }, [userId]);
+
+  const tryName = () => {
+    const found = findUser(nameInput);
+    if (found) {
+      setUserId(found.slug);
+      setError("");
+      // Check if already authed in localStorage
+      const stored = localStorage.getItem(`opus_auth_${found.slug}`);
+      if (stored === found.code) { setAuthed(true); }
+    } else {
+      setError("Hmm, I don't recognize that name");
+    }
+  };
 
   const tryCode = () => {
     const user = USERS[userId];
@@ -133,22 +157,26 @@ function Gate() {
     }
   };
 
+  const fontLink = <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />;
+
+  // Step 1: Enter name
   if (!userId) {
-    const userEntries = Object.entries(USERS);
     return (
       <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {fontLink}
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
         <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 32px" }}>find which songs are your favorites</p>
-        <p style={{ fontSize: 14, color: "#888", marginBottom: 20 }}>Who are you?</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {userEntries.map(([slug, u]) => (
-            <a key={slug} href={`?user=${slug}`} style={{ padding: "14px 24px", background: "#fff", border: "1px solid #ebebeb", borderRadius: 12, cursor: "pointer", textDecoration: "none", color: "#1a1a1a", fontWeight: 600, fontSize: 15, fontFamily: FONT, transition: "all 0.15s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#1a1a1a"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#ebebeb"; e.currentTarget.style.transform = "translateY(0)"; }}
-            >{u.name}</a>
-          ))}
+        <p style={{ fontSize: 14, color: "#888", marginBottom: 16 }}>What's your name?</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <input type="text" value={nameInput} onChange={(e) => { setNameInput(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") tryName(); }}
+            placeholder="Enter your name"
+            autoFocus
+            style={{ padding: "10px 16px", fontSize: 14, border: "1px solid #ddd", borderRadius: 10, fontFamily: FONT, outline: "none", width: 200, textAlign: "center" }}
+          />
+          <button onClick={tryName} style={{ padding: "10px 24px", fontSize: 14, fontWeight: 600, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: FONT }}>Go</button>
         </div>
+        {error && <p style={{ fontSize: 12, color: "#cb2431", marginTop: 10 }}>{error}</p>}
       </div>
     );
   }
@@ -157,18 +185,19 @@ function Gate() {
   if (!user) {
     return (
       <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {fontLink}
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
         <p style={{ fontSize: 14, color: "#cb2431", marginTop: 24 }}>Unknown user</p>
-        <a href="?" style={{ fontSize: 13, color: "#888", marginTop: 12, display: "inline-block" }}>&larr; Back</a>
+        <button onClick={() => { setUserId(null); setError(""); setNameInput(""); }} style={{ fontSize: 13, color: "#888", marginTop: 12, background: "none", border: "none", cursor: "pointer", fontFamily: FONT }}>&larr; Try again</button>
       </div>
     );
   }
 
+  // Step 2: Enter code
   if (!authed) {
     return (
       <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {fontLink}
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
         <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 32px" }}>find which songs are your favorites</p>
         <p style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 16 }}>Hey, {user.name}</p>
@@ -177,12 +206,13 @@ function Gate() {
           <input type="password" value={codeInput} onChange={(e) => { setCodeInput(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") tryCode(); }}
             placeholder="Code"
+            autoFocus
             style={{ padding: "10px 16px", fontSize: 14, border: "1px solid #ddd", borderRadius: 10, fontFamily: FONT, outline: "none", width: 160, textAlign: "center" }}
           />
           <button onClick={tryCode} style={{ padding: "10px 24px", fontSize: 14, fontWeight: 600, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: FONT }}>Go</button>
         </div>
         {error && <p style={{ fontSize: 12, color: "#cb2431", marginTop: 10 }}>{error}</p>}
-        <a href="?" style={{ fontSize: 12, color: "#aaa", marginTop: 20, display: "inline-block" }}>&larr; Switch user</a>
+        <button onClick={() => { setUserId(null); setCodeInput(""); setError(""); setNameInput(""); }} style={{ fontSize: 12, color: "#aaa", marginTop: 20, background: "none", border: "none", cursor: "pointer", fontFamily: FONT, display: "inline-block" }}>&larr; Not {user.name}?</button>
       </div>
     );
   }
