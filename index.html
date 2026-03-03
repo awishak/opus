@@ -685,7 +685,14 @@ function App({ userId, userName, useSeed }) {
     const allSorted = [...enriched].sort((a, b) => (a.title + a.artist).toLowerCase().localeCompare((b.title + b.artist).toLowerCase()));
     const filtered = search ? allSorted.filter((s) => (s.title + " " + s.artist).toLowerCase().includes(search.toLowerCase())) : allSorted;
     const startEdit = (s) => { setEditSong(s.id); setEditForm({ title: s.title, artist: s.artist, year: s.year ? String(s.year) : "" }); };
-    const saveEdit = async () => { const ns = db.songs.map(s => s.id === editSong ? { ...s, title: editForm.title.trim(), artist: editForm.artist.trim(), year: editForm.year ? parseInt(editForm.year) || null : null } : s); await save({ ...db, songs: ns }); setEditSong(null); };
+    const editRefs = { title: useRef(null), artist: useRef(null), year: useRef(null) };
+    const saveEdit = async () => {
+      const t = editRefs.title.current?.value?.trim() || editForm.title.trim();
+      const a = editRefs.artist.current?.value?.trim() || editForm.artist.trim();
+      const y = editRefs.year.current?.value || editForm.year;
+      const ns = db.songs.map(s => s.id === editSong ? { ...s, title: t, artist: a, year: y ? parseInt(y) || null : null } : s);
+      await save({ ...db, songs: ns }); setEditSong(null);
+    };
     const deleteSong = async (id) => { const ns = db.songs.filter(x => x.id !== id); const nm = db.matchups.filter(x => x.wi !== id && x.li !== id); await save({ ...db, songs: ns, matchups: nm }); setDelConfirm(null); };
     const inputStyle = { padding: "6px 10px", fontSize: 13, border: "1px solid #ddd", borderRadius: 8, fontFamily: FONT, outline: "none", width: "100%", boxSizing: "border-box" };
     return (
@@ -699,9 +706,9 @@ function App({ userId, userName, useSeed }) {
             <tbody>{filtered.slice(0, 80).map((s) => (
               editSong === s.id ? (
                 <tr key={s.id} style={{ background: "#f9f9f5" }}>
-                  <td style={TD}><input style={inputStyle} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></td>
-                  <td style={TD}><input style={inputStyle} value={editForm.artist} onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })} /></td>
-                  <td style={{ ...TD, textAlign: "right" }}><input style={{ ...inputStyle, width: 60, textAlign: "right" }} value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} /></td>
+                  <td style={TD}><input style={inputStyle} defaultValue={editForm.title} ref={editRefs.title} /></td>
+                  <td style={TD}><input style={inputStyle} defaultValue={editForm.artist} ref={editRefs.artist} /></td>
+                  <td style={{ ...TD, textAlign: "right" }}><input style={{ ...inputStyle, width: 60, textAlign: "right" }} defaultValue={editForm.year} ref={editRefs.year} /></td>
                   <td style={{ ...TD, textAlign: "right", color: "#aaa" }}>{s.m}</td>
                   <td style={{ ...TD, textAlign: "center" }}>
                     <span style={{ display: "flex", gap: 4, justifyContent: "center" }}>
