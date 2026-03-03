@@ -20,6 +20,20 @@
   <script type="text/babel">
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
+// ─── User Config ───
+// Add friends here: "urlslug": { name: "Display Name", code: "theirpasscode", seed: true/false }
+// seed: true = load your SEED data, false = start with empty database
+const USERS = {
+  "main": { name: "Me", code: "mypass123", seed: true },
+  // "alex": { name: "Alex", code: "pizza42", seed: false },
+  // "jordan": { name: "Jordan", code: "taco99", seed: false },
+};
+
+function getUserFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("user") || null;
+}
+
 const STORAGE_KEY = "songbattle_db_v3";
 const FONT = "'DM Sans', 'Helvetica Neue', system-ui, sans-serif";
 
@@ -51,8 +65,11 @@ function calcElo(songs, matchups) {
 const SUPABASE_URL = "https://ybuchgebudixbyrcxpik.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlidWNoZ2VidWRpeGJ5cmN4cGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzg3OTIsImV4cCI6MjA4ODA1NDc5Mn0.aF2M_fj6bVYKw-Tz1XxI9SiQB7lAtWzuhBRZbsai8QY";
 
+let ACTIVE_USER = null;
+
 async function supaFetch(method, body) {
-  const url = `${SUPABASE_URL}/rest/v1/opus_data?id=eq.main`;
+  const uid = ACTIVE_USER || "main";
+  const url = `${SUPABASE_URL}/rest/v1/opus_data?id=eq.${uid}`;
   const headers = { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": method === "POST" ? "resolution=merge-duplicates" : undefined };
   Object.keys(headers).forEach(k => headers[k] === undefined && delete headers[k]);
   const res = await fetch(method === "GET" ? url + "&select=data" : url, { method, headers, body: body ? JSON.stringify(body) : undefined });
@@ -70,7 +87,8 @@ async function loadDB() {
 
 async function saveDB(db) {
   try {
-    await supaFetch("POST", { id: "main", data: db, updated_at: new Date().toISOString() });
+    const uid = ACTIVE_USER || "main";
+    await supaFetch("POST", { id: uid, data: db, updated_at: new Date().toISOString() });
   } catch (e) { console.error(e); }
 }
 
@@ -86,7 +104,92 @@ function buildSeed() {
   }));
 }
 
-function App() {
+function Gate() {
+  const [userId, setUserId] = useState(getUserFromURL());
+  const [codeInput, setCodeInput] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [error, setError] = useState("");
+  const [userList, setUserList] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    const user = USERS[userId];
+    if (!user) { setError("Unknown user"); return; }
+    const stored = localStorage.getItem(`opus_auth_${userId}`);
+    if (stored === user.code) setAuthed(true);
+  }, [userId]);
+
+  const tryCode = () => {
+    const user = USERS[userId];
+    if (!user) return;
+    if (codeInput === user.code) {
+      localStorage.setItem(`opus_auth_${userId}`, codeInput);
+      setAuthed(true);
+      setError("");
+    } else {
+      setError("Wrong code");
+    }
+  };
+
+  if (!userId) {
+    const userEntries = Object.entries(USERS);
+    return (
+      <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
+        <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 32px" }}>find which songs are your favorites</p>
+        <p style={{ fontSize: 14, color: "#888", marginBottom: 20 }}>Who are you?</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {userEntries.map(([slug, u]) => (
+            <a key={slug} href={`?user=${slug}`} style={{ padding: "14px 24px", background: "#fff", border: "1px solid #ebebeb", borderRadius: 12, cursor: "pointer", textDecoration: "none", color: "#1a1a1a", fontWeight: 600, fontSize: 15, fontFamily: FONT, transition: "all 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#1a1a1a"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#ebebeb"; e.currentTarget.style.transform = "translateY(0)"; }}
+            >{u.name}</a>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const user = USERS[userId];
+  if (!user) {
+    return (
+      <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
+        <p style={{ fontSize: 14, color: "#cb2431", marginTop: 24 }}>Unknown user</p>
+        <a href="?" style={{ fontSize: 13, color: "#888", marginTop: 12, display: "inline-block" }}>&larr; Back</a>
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
+        <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 32px" }}>find which songs are your favorites</p>
+        <p style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 16 }}>Hey, {user.name}</p>
+        <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Enter your code to continue</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <input type="password" value={codeInput} onChange={(e) => { setCodeInput(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") tryCode(); }}
+            placeholder="Code"
+            style={{ padding: "10px 16px", fontSize: 14, border: "1px solid #ddd", borderRadius: 10, fontFamily: FONT, outline: "none", width: 160, textAlign: "center" }}
+          />
+          <button onClick={tryCode} style={{ padding: "10px 24px", fontSize: 14, fontWeight: 600, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: FONT }}>Go</button>
+        </div>
+        {error && <p style={{ fontSize: 12, color: "#cb2431", marginTop: 10 }}>{error}</p>}
+        <a href="?" style={{ fontSize: 12, color: "#aaa", marginTop: 20, display: "inline-block" }}>&larr; Switch user</a>
+      </div>
+    );
+  }
+
+  ACTIVE_USER = userId;
+  return <App userId={userId} userName={user.name} useSeed={user.seed} />;
+}
+
+function App({ userId, userName, useSeed }) {
   const [db, setDb] = useState(emptyDB());
   const [pg, setPg] = useState("compare");
   const [loading, setLoading] = useState(true);
@@ -106,7 +209,7 @@ function App() {
   useEffect(() => {
     loadDB().then((d) => {
       if (!d.imported) {
-        const nd = { songs: buildSeed(), matchups: [], imported: true };
+        const nd = { songs: useSeed ? buildSeed() : [], matchups: [], imported: true };
         saveDB(nd); setDb(nd);
       } else { setDb(d); }
       setLoading(false);
@@ -664,7 +767,7 @@ function App() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ textAlign: "center", marginBottom: 6 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: 0 }}>Opus</h1>
-        <p style={{ fontSize: 12, color: "#aaa", margin: "3px 0 0" }}>find which songs are your favorites</p>
+        <p style={{ fontSize: 12, color: "#aaa", margin: "3px 0 0" }}>{userName}'s rankings &middot; <a href="?" style={{ color: "#ccc", textDecoration: "none" }}>switch</a></p>
       </div>
       <nav style={{ display: "flex", gap: 3, justifyContent: "center", margin: "18px 0 26px", flexWrap: "wrap" }}>
         {nav.map(([id, label]) => (<button key={id} style={pill(pg === id)} onClick={() => { setPg(id); setSearch(""); setEditSong(null); setDelConfirm(null); if (id === "compare") setPair(null); if (id === "artists") setSelArtist(null); if (id === "decades") setSelDecade(null); }}>{label}</button>))}
@@ -681,7 +784,7 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+root.render(React.createElement(Gate));
   </script>
 </body>
 </html>
