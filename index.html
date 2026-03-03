@@ -165,12 +165,12 @@ function Gate() {
       <div style={{ fontFamily: FONT, maxWidth: 400, margin: "0 auto", padding: "80px 16px", textAlign: "center" }}>
         {fontLink}
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", color: "#111", margin: "0 0 4px" }}>Opus</h1>
-        <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 32px" }}>find which songs are your favorites</p>
-        <p style={{ fontSize: 14, color: "#888", marginBottom: 16 }}>What's your name?</p>
+        <p style={{ fontSize: 12, color: "#bbb", margin: "0 0 32px" }}>a music pairwise comparison program by andrew</p>
+        <p style={{ fontSize: 14, color: "#888", marginBottom: 16 }}>Type your name</p>
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <input type="text" value={nameInput} onChange={(e) => { setNameInput(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") tryName(); }}
-            placeholder="Enter your name"
+            placeholder="Your name"
             autoFocus
             style={{ padding: "10px 16px", fontSize: 14, border: "1px solid #ddd", borderRadius: 10, fontFamily: FONT, outline: "none", width: 200, textAlign: "center" }}
           />
