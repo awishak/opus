@@ -1,13 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Opus</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opus – Find Your Favorite Songs</title>
+  <meta name="description" content="Pairwise song comparison app to discover your true favorite songs." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #FAFAF9; -webkit-font-smoothing: antialiased; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+  <script type="text/babel" data-type="module">
+// ─── Storage shim (localStorage-backed, matches window.storage API) ───
+if (!window.storage) {
+  window.storage = {
+    async get(key) {
+      const v = localStorage.getItem(key);
+      return v !== null ? { key, value: v } : null;
+    },
+    async set(key, value) {
+      localStorage.setItem(key, value);
+      return { key, value };
+    },
+    async delete(key) {
+      localStorage.removeItem(key);
+      return { key, deleted: true };
+    },
+    async list(prefix) {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!prefix || k.startsWith(prefix)) keys.push(k);
+      }
+      return { keys };
+    }
+  };
+}
+  </script>
+
+  <script type="text/babel" src="app.jsx" data-type="module"></script>
+
+  <script type="text/babel" data-type="module">
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
 </html>
