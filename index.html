@@ -276,11 +276,11 @@ function App({ userId, userName, useSeed }) {
     const q1Ids = new Set(qualifiedByPct.slice(0, q1Cutoff).map(s => s.id));
     const q1w = {};
     db.songs.forEach(s => { q1w[s.id] = 0; });
-    // Count imported wins roughly — we can't know opponents, so only count live matchups
+    // Count from live matchups: a Q1 win = you beat a song currently in the top 25%
     db.matchups.forEach(m => {
-      if (q1Ids.has(m.li)) { q1w[m.wi] = (q1w[m.wi] || 0) + 1; }
+      if (q1Ids.has(m.li) && q1w[m.wi] !== undefined) { q1w[m.wi]++; }
     });
-    return { q1Ids, q1w };
+    return { q1Ids, q1w, q1Count: q1Cutoff, totalRanked: qualifiedByPct.length };
   }, [enriched, db.matchups, db.songs, minGP]);
 
   const enrichedWithQ1 = useMemo(() => enriched.map(s => ({ ...s, q1w: q1Data.q1w[s.id] || 0 })), [enriched, q1Data]);
@@ -486,6 +486,7 @@ function App({ userId, userName, useSeed }) {
           <button style={tog(sortBy === "elo")} onClick={() => setSortBy("elo")}>Elo</button>
           <button style={tog(sortBy === "q1")} onClick={() => setSortBy("q1")}>Q1 Wins</button>
         </div>
+        {sortBy === "q1" && <p style={{ fontSize: 11, color: "#bbb", margin: "0 0 8px" }}>Q1 = wins vs top {q1Data.q1Count} songs (top 25% of {q1Data.totalRanked} ranked). Only counts live matchups, not imported records.</p>}
         <div style={{ display: "flex", gap: 5, marginBottom: 14, alignItems: "center" }}>
           <span style={{ fontSize: 11, color: "#aaa", marginRight: 4 }}>Min GP:</span>
           <button style={tog(minGP === 5)} onClick={() => setMinGP(5)}>5</button>
